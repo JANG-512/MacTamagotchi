@@ -144,27 +144,41 @@ function initMultiplayer() {
       if (currentMenu === 'status') renderStatus();
       broadcastEvent('showProp', ['👋', 1500, 'idle']);
       
-      conn.on('open', () => {
+      const onHostConnOpen = () => {
         conn.send({ type: 'state', state });
-      });
+      };
+      if (conn.open) onHostConnOpen(); else conn.on('open', onHostConnOpen);
 
       conn.on('data', (data) => {
-        if (data.type === 'action') processAction(data.action);
+        if (data && data.type === 'action') processAction(data.action);
       });
 
       conn.on('close', () => {
         connections = connections.filter(c => c !== conn);
         if (currentMenu === 'status') renderStatus();
       });
+      conn.on('error', () => {
+        connections = connections.filter(c => c !== conn);
+      });
     }
+  });
+
+  peer.on('error', (err) => {
+     console.error('Peer error:', err);
+     if (isGuest && err.type === 'peer-unavailable') {
+        alert('방을 찾을 수 없거나 호스트가 나갔습니다.');
+     }
   });
 }
 
 function setupGuestConnection(conn) {
-  conn.on('open', () => {
+  const onGuestConnOpen = () => {
     if (currentMenu === 'status') renderStatus();
-  });
+  };
+  if (conn.open) onGuestConnOpen(); else conn.on('open', onGuestConnOpen);
+
   conn.on('data', (data) => {
+    if (!data) return;
     if (data.type === 'state') {
       state = data.state;
       renderApp();
@@ -173,7 +187,11 @@ function setupGuestConnection(conn) {
     }
   });
   conn.on('close', () => {
+    hostConnection = null;
     if (currentMenu === 'status') renderStatus();
+  });
+  conn.on('error', (err) => {
+     console.error('Guest connection error:', err);
   });
 }
 
@@ -482,7 +500,7 @@ const handleBtnB = () => {
       renderStatus();
     } else {
       if (isGuest) {
-        if(hostConnection && hostConnection.open) hostConnection.send({ type: 'action', action });
+        if(hostConnection) hostConnection.send({ type: 'action', action });
       } else {
         processAction(action);
       }
@@ -493,7 +511,7 @@ const handleBtnB = () => {
   } else if (currentMenu === 'food_submenu') {
     let act = (submenuChoice === 0) ? 'food_meal' : 'food_snack';
     if (isGuest) {
-        if(hostConnection && hostConnection.open) hostConnection.send({ type: 'action', action: act });
+        if(hostConnection) hostConnection.send({ type: 'action', action: act });
     } else {
         processAction(act);
     }
