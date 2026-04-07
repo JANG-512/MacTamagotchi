@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tamagotchi Admin</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; text-align: center; background: #f0f0f0; }
+    .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); display: inline-block; text-align: left; max-width: 400px; width: 100%;}
+    button { padding: 12px 20px; margin: 10px 0; font-size: 16px; width: 100%; border: none; background: #007bff; color: white; border-radius: 8px; cursor: pointer; }
+    button:active { background: #0056b3; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h2>Admin Page</h2>
+    <p>Use this page to manually trigger the Notification API.</p>
+    <button id="req-btn">1. Request Notification Permission</button>
+    <button id="test-btn">2. Send Test Alert Notification</button>
+  </div>
+
+  <script>
+    document.getElementById('req-btn').addEventListener('click', () => {
+      if ('Notification' in window) {
+        Notification.requestPermission().then(p => alert('Permission state: ' + p));
+      } else {
+        alert('Browser does not support Notification API');
+      }
+    });
+
+    document.getElementById('test-btn').addEventListener('click', () => {
+      if ('Notification' in window && Notification.permission === 'granted') {
+        new Notification("MacTamagotchi Test ⚠️", { 
+          body: "This is a test notification from Admin page! 🍔🚿💉🎮",
+          icon: "./icon-192.png"
+        });
+      } else {
+        alert('Permission not granted! Please click "Request Notification Permission" first.');
+      }
+    });
+  </script>
+</body>
+</html>

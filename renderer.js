@@ -16,13 +16,19 @@ const alertIcon = document.querySelector('.icon.alert');
 let isFirstRender = true;
 let notifiedAlerts = { hunger: false, happy: false, sick: false, poop: false };
 
-// Notification API helpers
-function requestNotificationPermission() {
+// Browser Permissions Setup
+function requestPermissions() {
+  // Notification Permission
   if ('Notification' in window && Notification.permission === 'default') {
     Notification.requestPermission();
   }
+  
+  // DeviceMotionEvent Permission (Required for iOS 13+)
+  if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+    DeviceMotionEvent.requestPermission().catch(console.error);
+  }
 }
-document.addEventListener('click', () => { requestNotificationPermission(); }, { once: true });
+document.addEventListener('click', () => { requestPermissions(); }, { once: true });
 
 function sendNotification(title, body) {
   if ('Notification' in window && Notification.permission === 'granted') {
