@@ -119,8 +119,7 @@ let isGuest = false;
 let connections = [];
 let hostConnection = null;
 
-const mpBtn = document.getElementById('btn-host-copy');
-const mpStatus = document.getElementById('mp-status');
+let statusPage = 0;
 
 function initMultiplayer() {
   const urlParams = new URLSearchParams(window.location.search);
@@ -132,26 +131,18 @@ function initMultiplayer() {
   peer.on('open', (id) => {
     if (roomToJoin) {
       isGuest = true;
-      if (mpStatus) mpStatus.innerText = '방 참가 중...';
-      if (mpBtn) mpBtn.style.display = 'none';
-      
       hostConnection = peer.connect(roomToJoin);
       setupGuestConnection(hostConnection);
     } else {
       isHost = true;
-      if (mpStatus) mpStatus.innerText = '오프라인 (손님 대기 중)';
-      if (mpBtn) mpBtn.onclick = () => {
-        const link = window.location.origin + window.location.pathname + '?room=' + id;
-        navigator.clipboard.writeText(link);
-        alert('초대 링크가 복사되었습니다! 친구에게 공유하세요.');
-      };
     }
   });
 
   peer.on('connection', (conn) => {
     if (isHost) {
       connections.push(conn);
-      if (mpStatus) mpStatus.innerText = `온라인 (손님 ${connections.length}명)`;
+      if (currentMenu === 'status') renderStatus();
+      broadcastEvent('showProp', ['👋', 1500, 'idle']);
       
       conn.on('open', () => {
         conn.send({ type: 'state', state });
@@ -163,7 +154,7 @@ function initMultiplayer() {
 
       conn.on('close', () => {
         connections = connections.filter(c => c !== conn);
-        if (mpStatus) mpStatus.innerText = connections.length > 0 ? `온라인 (손님 ${connections.length}명)` : '오프라인 (손님 대기 중)';
+        if (currentMenu === 'status') renderStatus();
       });
     }
   });
@@ -171,7 +162,7 @@ function initMultiplayer() {
 
 function setupGuestConnection(conn) {
   conn.on('open', () => {
-    if (mpStatus) mpStatus.innerText = '온라인 (방 접속됨)';
+    if (currentMenu === 'status') renderStatus();
   });
   conn.on('data', (data) => {
     if (data.type === 'state') {
@@ -182,7 +173,7 @@ function setupGuestConnection(conn) {
     }
   });
   conn.on('close', () => {
-    if (mpStatus) mpStatus.innerText = '호스트와 연결 끊김';
+    if (currentMenu === 'status') renderStatus();
   });
 }
 
@@ -328,17 +319,37 @@ function showProp(emoji, time, animClass) {
 }
 
 function renderStatus() {
-  const hHearts = Array.from({length: 4}).map((_, i) => `<div class="heart ${i < state.hunger ? 'filled' : ''}"></div>`).join('');
-  const hpHearts = Array.from({length: 4}).map((_, i) => `<div class="heart ${i < state.happy ? 'filled' : ''}"></div>`).join('');
-  
-  statusContent.innerHTML = `
-    <p>HUNGRY</p>
-    <div class="hearts">${hHearts}</div>
-    <p>HAPPY</p>
-    <div class="hearts">${hpHearts}</div>
-    <p>AGE: ${state.age} YR</p>
-    <p>WGT: ${state.weight} lb</p>
-  `;
+  if (statusPage === 0) {
+    const hHearts = Array.from({length: 4}).map((_, i) => `<div class="heart ${i < state.hunger ? 'filled' : ''}"></div>`).join('');
+    const hpHearts = Array.from({length: 4}).map((_, i) => `<div class="heart ${i < state.happy ? 'filled' : ''}"></div>`).join('');
+    
+    statusContent.innerHTML = `
+      <p>HUNGRY</p>
+      <div class="hearts">${hHearts}</div>
+      <p>HAPPY</p>
+      <div class="hearts">${hpHearts}</div>
+      <p>AGE: ${state.age} YR</p>
+      <p>WGT: ${state.weight} lb</p>
+    `;
+  } else {
+    if (isGuest) {
+      const netStat = (hostConnection && hostConnection.open) ? 'CONNECTED' : 'DISCONNECTED';
+      statusContent.innerHTML = `
+        <p style="margin-bottom:6px">📡 NETWORK</p>
+        <p>ROLE: GUEST</p>
+        <p>STAT: ${netStat}</p>
+        <p style="margin-top:8px; font-size:9px;">Wait for Host</p>
+      `;
+    } else {
+      const connCount = connections.length;
+      statusContent.innerHTML = `
+        <p style="margin-bottom:6px">📡 NETWORK</p>
+        <p>ROLE: HOST</p>
+        <p>GUESTS: ${connCount}</p>
+        <p style="margin-top:8px; font-size:9px;">Press [B] to Copy Link</p>
+      `;
+    }
+  }
 }
 
 // ------ GAME LOOP ------ //
@@ -432,6 +443,9 @@ const handleBtnA = () => {
   } else if (currentMenu === 'food_submenu') {
     submenuChoice = (submenuChoice === 0) ? 1 : 0;
     submenuText.innerText = submenuChoice === 0 ? "MEAL" : "SNACK";
+  } else if (currentMenu === 'status') {
+    statusPage = (statusPage === 0) ? 1 : 0;
+    renderStatus();
   }
 };
 
@@ -463,6 +477,7 @@ const handleBtnB = () => {
       submenuText.innerText = "MEAL";
     } else if (action === 'status') {
       currentMenu = 'status';
+      statusPage = 0;
       statusOverlay.classList.remove('hidden');
       renderStatus();
     } else {
@@ -485,6 +500,15 @@ const handleBtnB = () => {
     submenuOverlay.classList.add('hidden');
     currentMenu = null;
     selectedIcon = -1;
+  } else if (currentMenu === 'status') {
+    if (statusPage === 1 && isHost) {
+      if(peer && peer.open) {
+          const link = window.location.origin + window.location.pathname + '?room=' + peer.id;
+          navigator.clipboard.writeText(link);
+          statusContent.innerHTML += `<p style="margin-top:6px; color:#1a231a;">COPIED!</p>`;
+          setTimeout(renderStatus, 1500);
+      }
+    }
   }
 };
 
