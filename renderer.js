@@ -112,7 +112,125 @@ function beep(freq = 600, duration = 0.1, type = 'square') {
   osc.stop(audioCtx.currentTime + duration);
 }
 
+// MULTIPLAYER LOGIC
+let peer = null;
+let isHost = false;
+let isGuest = false;
+let connections = [];
+let hostConnection = null;
+
+const mpBtn = document.getElementById('btn-host-copy');
+const mpStatus = document.getElementById('mp-status');
+
+function initMultiplayer() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const roomToJoin = urlParams.get('room');
+
+  if (typeof Peer === 'undefined') return;
+  peer = new Peer();
+
+  peer.on('open', (id) => {
+    if (roomToJoin) {
+      isGuest = true;
+      if (mpStatus) mpStatus.innerText = '방 참가 중...';
+      if (mpBtn) mpBtn.style.display = 'none';
+      
+      hostConnection = peer.connect(roomToJoin);
+      setupGuestConnection(hostConnection);
+    } else {
+      isHost = true;
+      if (mpStatus) mpStatus.innerText = '오프라인 (손님 대기 중)';
+      if (mpBtn) mpBtn.onclick = () => {
+        const link = window.location.origin + window.location.pathname + '?room=' + id;
+        navigator.clipboard.writeText(link);
+        alert('초대 링크가 복사되었습니다! 친구에게 공유하세요.');
+      };
+    }
+  });
+
+  peer.on('connection', (conn) => {
+    if (isHost) {
+      connections.push(conn);
+      if (mpStatus) mpStatus.innerText = `온라인 (손님 ${connections.length}명)`;
+      
+      conn.on('open', () => {
+        conn.send({ type: 'state', state });
+      });
+
+      conn.on('data', (data) => {
+        if (data.type === 'action') processAction(data.action);
+      });
+
+      conn.on('close', () => {
+        connections = connections.filter(c => c !== conn);
+        if (mpStatus) mpStatus.innerText = connections.length > 0 ? `온라인 (손님 ${connections.length}명)` : '오프라인 (손님 대기 중)';
+      });
+    }
+  });
+}
+
+function setupGuestConnection(conn) {
+  conn.on('open', () => {
+    if (mpStatus) mpStatus.innerText = '온라인 (방 접속됨)';
+  });
+  conn.on('data', (data) => {
+    if (data.type === 'state') {
+      state = data.state;
+      renderApp();
+    } else if (data.type === 'event' && data.eventName === 'showProp') {
+      showProp(data.args[0], data.args[1], data.args[2]); 
+    }
+  });
+  conn.on('close', () => {
+    if (mpStatus) mpStatus.innerText = '호스트와 연결 끊김';
+  });
+}
+
+function processAction(action) {
+  if (state.isDead) return;
+  if (state.isSleeping && action !== 'light') return;
+
+  if (action === 'bath') {
+    if (state.poops > 0) {
+      state.poops = 0;
+      broadcastEvent('showProp', ['🚿', 1500, 'bathing']);
+    }
+  } else if (action === 'med') {
+    if (state.sick) {
+      state.sick = false;
+      broadcastEvent('showProp', ['💉', 1500, 'walking']);
+    }
+  } else if (action === 'light') {
+    state.isSleeping = !state.isSleeping;
+  } else if (action === 'play') {
+    state.happy = Math.min(4, state.happy + 1);
+    state.weight = Math.max(1, state.weight - 1);
+    broadcastEvent('showProp', ['🎾', 2500, 'playing']);
+  } else if (action === 'discipline') {
+    broadcastEvent('showProp', ['💢', 1000, 'idle']);
+  } else if (action === 'food_meal') {
+    state.hunger = Math.min(4, state.hunger + 1);
+    state.weight += 1;
+    broadcastEvent('showProp', ['🍱', 2500, 'eating']);
+  } else if (action === 'food_snack') {
+    state.happy = Math.min(4, state.happy + 1);
+    state.weight += 2;
+    broadcastEvent('showProp', ['🍰', 2500, 'eating']);
+  }
+  saveState();
+}
+
+function broadcastEvent(eventName, args) {
+  if (eventName === 'showProp') showProp(...args);
+  if (isHost && connections.length > 0) {
+    connections.forEach(c => c.send({ type: 'event', eventName, args }));
+  }
+}
+
+window.addEventListener('DOMContentLoaded', initMultiplayer);
+
 function loadState() {
+  if (window.location.search.includes('room=')) return; // Guest waits for state
   const saved = localStorage.getItem(SAVE_KEY);
   if (saved) {
     try {
@@ -131,9 +249,14 @@ function loadState() {
 }
 
 function saveState() {
+  if (isGuest) return; 
   state.lastSaved = Date.now();
   localStorage.setItem(SAVE_KEY, JSON.stringify(state));
   renderApp();
+  
+  if (isHost && connections.length > 0) {
+    connections.forEach(c => c.send({ type: 'state', state }));
+  }
 }
 
 function setAnim(anim) {
@@ -222,6 +345,7 @@ function renderStatus() {
 
 // 60-second background logic tick
 setInterval(() => {
+  if (isGuest) return; // Only host ticks
   if (state.isDead) return;
   
   if (!state.isSleeping) {
@@ -337,46 +461,30 @@ const handleBtnB = () => {
       submenuChoice = 0;
       submenuOverlay.classList.remove('hidden');
       submenuText.innerText = "MEAL";
-    } else if (action === 'bath') {
-      if (state.poops > 0) {
-        state.poops = 0;
-        showProp('🚿', 1500, 'bathing');
-      }
-    } else if (action === 'med') {
-      if(state.sick) {
-        state.sick = false;
-        showProp('💉', 1500, 'walking');
-      }
-    } else if (action === 'light') {
-      state.isSleeping = !state.isSleeping;
-    } else if (action === 'play') {
-      state.happy = Math.min(4, state.happy + 1);
-      state.weight = Math.max(1, state.weight - 1);
-      showProp('🎾', 2500, 'playing');
     } else if (action === 'status') {
       currentMenu = 'status';
       statusOverlay.classList.remove('hidden');
       renderStatus();
-    } else if (action === 'discipline') {
-      showProp('💢', 1000, 'idle');
+    } else {
+      if (isGuest) {
+        if(hostConnection && hostConnection.open) hostConnection.send({ type: 'action', action });
+      } else {
+        processAction(action);
+      }
     }
     
-    selectedIcon = -1; 
-    saveState();
+    if (action !== 'food' && action !== 'status') selectedIcon = -1;
+    
   } else if (currentMenu === 'food_submenu') {
+    let act = (submenuChoice === 0) ? 'food_meal' : 'food_snack';
+    if (isGuest) {
+        if(hostConnection && hostConnection.open) hostConnection.send({ type: 'action', action: act });
+    } else {
+        processAction(act);
+    }
     submenuOverlay.classList.add('hidden');
     currentMenu = null;
-    
-    if (submenuChoice === 0) { // Meal
-      state.hunger = Math.min(4, state.hunger + 1);
-      state.weight += 1;
-      showProp('🍱', 2500, 'eating');
-    } else { // Snack
-      state.happy = Math.min(4, state.happy + 1);
-      state.weight += 2;
-      showProp('🍰', 2500, 'eating');
-    }
-    saveState();
+    selectedIcon = -1;
   }
 };
 
