@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#13141a">
+  <title>MacTamagotchi</title>
+  <link rel="manifest" href="./manifest.json">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="tamagotchi">
+    <!-- LCD Screen -->
+    <div class="screen-container">
+      <div class="screen" id="screen">
+        <!-- Top Menu Icons -->
+        <div class="menu-row top">
+          <div class="icon" data-action="food">🍔</div>
+          <div class="icon" data-action="light">💡</div>
+          <div class="icon" data-action="play">🎮</div>
+          <div class="icon" data-action="med">💊</div>
+        </div>
+        
+        <!-- Game Canvas -->
+        <div class="game-area">
+          <div id="pet" class="pet idle">
+            <div class="sweat"></div>
+            <!-- Pet face expression can be added dynamically here later if needed -->
+          </div>
+          <div id="poops" class="poops"></div>
+          <div id="prop" class="prop hidden"></div>
+          
+          <!-- Overlays -->
+          <div id="status-screen" class="overlay hidden">
+            <div class="status-page" id="status-content">
+              <!-- Rendered via JS -->
+            </div>
+          </div>
+          
+          <div id="submenu" class="overlay hidden">
+            <p id="submenu-text"></p>
+            <div class="arrow">></div>
+          </div>
+        </div>
+
+        <!-- Bottom Menu Icons -->
+        <div class="menu-row bottom">
+          <div class="icon" data-action="bath">🛁</div>
+          <div class="icon" data-action="status">⚖️</div>
+          <div class="icon" data-action="discipline">🗣️</div>
+          <div class="icon alert" data-action="alert">⚠️</div>
+        </div>
+        
+      </div>
+    </div>
+    
+    <!-- Functional Buttons -->
+    <div class="buttons">
+      <div class="btn" id="btn-a"></div>
+      <div class="btn" id="btn-b"></div>
+      <div class="btn" id="btn-c"></div>
+    </div>
+  </div>
+  
+  <script src="renderer.js"></script>
+</body>
+</html>
