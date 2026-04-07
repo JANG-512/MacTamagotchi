@@ -13,6 +13,55 @@ const submenuText = document.getElementById('submenu-text');
 const icons = Array.from(document.querySelectorAll('.icon')).filter(i => !i.classList.contains('alert'));
 const alertIcon = document.querySelector('.icon.alert');
 
+let isFirstRender = true;
+let notifiedAlerts = { hunger: false, happy: false, sick: false, poop: false };
+
+// Notification API helpers
+function requestNotificationPermission() {
+  if ('Notification' in window && Notification.permission === 'default') {
+    Notification.requestPermission();
+  }
+}
+document.addEventListener('click', () => { requestNotificationPermission(); }, { once: true });
+
+function sendNotification(title, body) {
+  if ('Notification' in window && Notification.permission === 'granted') {
+    new Notification(title, { body: body });
+  }
+}
+
+function checkAndSendNotifications() {
+  if (!state || state.isDead) return;
+
+  if (state.hunger === 0 && !notifiedAlerts.hunger) {
+    notifiedAlerts.hunger = true;
+    if (!isFirstRender) sendNotification("MacTamagotchi ⚠️", "배가 고파요! 🍔");
+  } else if (state.hunger > 0) {
+    notifiedAlerts.hunger = false;
+  }
+
+  if (state.happy === 0 && !notifiedAlerts.happy) {
+    notifiedAlerts.happy = true;
+    if (!isFirstRender) sendNotification("MacTamagotchi ⚠️", "우울해요! 놀아주세요! 🎮");
+  } else if (state.happy > 0) {
+    notifiedAlerts.happy = false;
+  }
+
+  if (state.sick && !notifiedAlerts.sick) {
+    notifiedAlerts.sick = true;
+    if (!isFirstRender) sendNotification("MacTamagotchi ⚠️", "아파요! 약을 주세요! 💉");
+  } else if (!state.sick) {
+    notifiedAlerts.sick = false;
+  }
+
+  if (state.poops >= 4 && !notifiedAlerts.poop) {
+    notifiedAlerts.poop = true;
+    if (!isFirstRender) sendNotification("MacTamagotchi ⚠️", "냄새나요! 목욕시켜주세요! 🚿");
+  } else if (state.poops < 4) {
+    notifiedAlerts.poop = false;
+  }
+}
+
 const SAVE_KEY = 'mactamagotchi_state';
 
 const DEFAULT_STATE = {
@@ -113,6 +162,9 @@ function renderApp() {
   } else {
     alertIcon.classList.remove('active');
   }
+
+  checkAndSendNotifications();
+  isFirstRender = false;
 
   let extraFlags = state.sick ? '🤒 ' : '';
   poopsContainer.innerHTML = extraFlags + '💩'.repeat(state.poops);
